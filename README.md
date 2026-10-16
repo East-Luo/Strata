@@ -1,70 +1,69 @@
-# Blog
+# Strata
 
-纯静态博客：入口与数据彻底分离，前端直接渲染 Markdown。页面托管在自己的服务器上，文章仓库只放 `.md` 与媒体文件，访问者拿到页面后与源服务器零交互。
+纯静态博客：页面与文章分属两个仓库，浏览器直接渲染 Markdown
+零构建、零框架、零依赖安装
 
-## 架构
+## 设计理念：层
 
-```
-浏览器（成品：裸 HTML + 原生 JS + marked/highlight.js 纯函数库）
-  ├── 入口与静态资源：由你的服务器提供（index.html + assets/）
-  ├── 渲染库：marked ESM + highlight.js，从 jsDelivr CDN 动态拉取
-  └── 文章数据：GitHub API 枚举目录 → raw 拉取 md → 前端 marked 渲染 + hljs 高亮
-```
+从代码逻辑到视觉表现，每一层只做自己的事，下一层基于上一层生长
 
-加载流程的两个判定节点：
+- **数据层**：页面仓库与文章仓库互不知晓，只由一个 `config.json` 连接；发布文章只需 clone 仓库，正常编写 .md 和添加媒体，push 后自动更新
+- **状态层**：`core/window-manager.js` 是纯逻辑窗口栈（发布订阅，不接触 DOM）；侧栏、搜索、标签栏、文章窗口乃至页面标题都是它的投影
+- **平台层**：`core/` 与 `platforms/` 分离；同一状态源对应桌面、手机两套视图，接口仅 `initComponents()` / `reveal()` 两个函数
+- **样式层**：`tokens.css` 通用，`desktop.css` / `mobile.css` 平台专属，严格分流
+- **视觉层**：canvas 背景 → 搜索 → 文章窗口 → 侧栏 / Dock，各居其 z 轴高度
 
-```
-白点 → 拉取 CDN 依赖（marked + highlight.js）→ 发散延伸
-     → GitHub API 枚举+拉取全部 md → 延伸到底 → 封边连线 → 升维旋转 + UI 淡入
-```
+## 技术实现
 
-失败提示按阶段区分：拉取 CDN 依赖失败提示「加载渲染依赖失败」，文章获取失败提示「从 GitHub 获取文章失败」。
+- 裸 HTML + 原生 ES Module + 原生 CSS，无转译、无打包；marked 与 highlight.js 在运行时从 CDN 动态 `import()`，以纯函数库身份参与，不参与构建
+- 没有运行时框架：状态与视图的同步由一个几十行的发布订阅栈承担
+- 文章枚举走 `meta.json`（文章仓库 push 时由 GitHub Actions 自动生成），正文走 raw 拉取，均不消耗 GitHub API 配额
+- Markdown 中的相对路径媒体自动重写为文章仓库的 raw 绝对地址
 
-分层：
-
-| 模块 | 文件 | 职责 |
-|------|------|------|
-| 编排 | `assets/javascript/main.js` | 引导、CDN 拉库、超时、重试、组件初始化 |
-| 数据 | `assets/javascript/data.js` | API 枚举、拉取 md、marked 渲染、全文搜索 |
-| 背景 | `assets/javascript/background.js` | 加载动画 + 四面体背景（同一 canvas） |
-| 侧边栏 | `assets/javascript/sidebar.js` | 文章列表、点击打开 |
-| 搜索 | `assets/javascript/search.js` | 展开交互、全文搜索、结果渲染 |
-| 窗口栈 | `assets/javascript/window-manager.js` | 打开/置顶/关闭、LRU 淘汰（上限 8 篇） |
-| 标签栏 | `assets/javascript/tabbar.js` | 栈状态的视图投影 |
-| 文章视图 | `assets/javascript/article-view.js` | 窗口 DOM、同步注入、转场 |
-
-## 文章仓库
-
-公开仓库 `East-Luo/Articles`，纯数据、零清单：
-
-```
-1/
-    milestone.md      # 第一个 # 行是标题
-    image.png         # 相对路径媒体随文章走
-2/
-    ...
-```
-
-- 无 `meta.json`、无 frontmatter、无 html 产物
-- `id` = 目录名（数字，顺序按数字排序），标题 = 文中第一个 `# 标题` 行
-- md 里的相对路径图片/链接会被自动重写为仓库 raw 绝对地址
-- 写文章 = 建目录放 `.md` + 媒体，push 即生效（GitHub API 即时无缓存）
-
-## 部署
-
-改 `data.js` 顶部两个常量即可切换数据源：
-
-```js
-const REPO = 'East-Luo/Articles';
-const BRANCH = 'main';
-```
-
-## 本地开发
-
-需要 HTTP 服务（`fetch` 与 ES Module 在 `file://` 下不可用）：
+## 快速上手
 
 ```bash
-python -m http.server 8000
+git clone https://github.com/East-Luo/Strata.git
+cd Strata && cp config.example.json config.json   # 编辑 config.json，填入你的文章仓库
+python -m http.server 8000                      # 本地预览；或把整个目录交给任意静态服务器托管
 ```
 
-匿名 GitHub API 限流 60 次/小时，个人博客流量不会触及。
+可选：把 `articles-setup/meta.yml` 复制到文章仓库的 `.github/workflows/`，push 时自动生成文章清单，解除 API 限流
+
+## 文章仓库约定
+
+```
+1/                # 文章序号，纯数字
+    milestone.md  # 文章文件，标题自动取自文中第一个 # 行
+    image.png     # 媒体与文章同目录存放，博客按结构自动解析
+```
+
+- 写作与发布彻底分离：自然地写 md、push，即自动更新
+
+## 目录结构
+
+```
+index.html                  入口（只有 canvas + 加载状态，其余 DOM 由组件自建）
+config.example.json         数据源配置模板
+articles-setup/             文章仓库侧的 meta 生成 workflow 模板
+assets/
+  css/
+    tokens.css              设计令牌 + 跨平台通用样式
+    desktop.css / mobile.css
+  javascript/
+    main.js                 编排：引导、CDN 拉库、超时、平台加载
+    platform.js             平台检测
+    core/                   跨平台公共层
+      data.js               配置加载、meta 枚举、文章拉取、渲染、全文搜索
+      window-manager.js     窗口栈
+      background.js         加载动画 + 四面体背景
+      branding.js           随机数学曲线 favicon + 标题
+      search-ui.js          搜索结果渲染
+    platforms/
+      desktop/              侧栏、搜索、标签栏、文章窗口
+      mobile/               顶部抽屉、搜索、底部 Dock
+```
+
+## License
+
+MIT

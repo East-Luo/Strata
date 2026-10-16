@@ -77,12 +77,18 @@ const stageDur = () => rand(650, 850); // ~750ms 一阶段
 const easeOut = (t) => 1 - Math.pow(1 - t, 3);
 const noise = (x) => Math.sin(x) * 0.2 + 0.2;
 
+// 位图尺寸与 CSS 尺寸必须同源同步：CSS 端 inset:0 跟随布局视口，innerWidth/Height
+// 在移动端随地址栏收展变化且 iOS 的 resize 事件不可靠（需 visualViewport 兜底），
+// 两者一旦错位，位图被拉伸/截断，图形中心就会偏移
 function resize() {
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
+    canvas.style.width = `${window.innerWidth}px`;
+    canvas.style.height = `${window.innerHeight}px`;
 }
 
 window.addEventListener('resize', resize);
+window.visualViewport?.addEventListener('resize', resize);
 resize();
 
 function lineColor(alpha) {

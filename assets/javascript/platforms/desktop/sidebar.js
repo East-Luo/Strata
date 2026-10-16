@@ -1,5 +1,4 @@
 // sidebar.js —— 侧边栏（桌面）：渲染文章列表，点击打开文章，高亮当前置顶文章。
-// 自建 DOM，平台差异完全封装在模块内部。
 
 import * as data from '../../core/data.js';
 import * as wm from '../../core/window-manager.js';

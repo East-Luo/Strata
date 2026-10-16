@@ -32,7 +32,7 @@ function withTimeout(promise, ms) {
 }
 
 async function boot() {
-    // 尽早设置图标与标题，避免加载期间短暂显示默认「Blog」
+    // 尽早设置图标与标题，避免加载期间短暂显示默认「Strata」
     initBranding();
 
     const intro = createIntro({ onReady: revealUI, onRetry: boot });
@@ -62,11 +62,11 @@ async function boot() {
         return;
     }
 
-    // 封边期硬检查点：GitHub API 枚举 + 拉取渲染全部文章
+    // 封边期硬检查点：拉取 meta + 枚举渲染全部文章
     try {
         await withTimeout(data.fetchArticles(), TIMEOUT);
     } catch (e) {
-        intro.fail('从 GitHub 获取文章失败');
+        intro.fail(e.userMessage || '从 GitHub 获取文章失败');
         return;
     }
     intro.dataReady();

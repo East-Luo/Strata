@@ -7,16 +7,10 @@
     <meta name="color-scheme" content="dark">
     <title></title>
 
-    <!-- 通用样式（跨平台）：令牌、背景、加载状态 -->
+    <!-- 通用样式（跨平台）：令牌、背景、加载状态。
+         防 FOUC 无需内联：本文件是 render-blocking 加载，平台组件 DOM 又由 JS
+         在对应平台 CSS 注入后才创建，不存在未样式化闪现窗口 -->
     <link rel="stylesheet" href="assets/css/tokens.css">
-
-    <!-- 防 FOUC：平台组件自建 DOM 前先隐藏（组件根元素 class 为跨平台约定） -->
-    <style>
-        .search-window,
-        .sidebar {
-            opacity: 0;
-        }
-    </style>
 </head>
 
 <body>

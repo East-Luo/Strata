@@ -23,6 +23,8 @@ body {
     padding: 0;
     overflow: hidden;
     height: 100vh;
+    /* 禁止下拉刷新/橡皮筋回弹：移动端整页反弹会连带所有 fixed 层一起位移 */
+    overscroll-behavior: none;
     background-color: var(--color-bg);
     color: var(--color-fg);
 }

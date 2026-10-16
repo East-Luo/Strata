@@ -1,11 +1,29 @@
-// data.js —— 数据层：GitHub API 枚举文章目录 → 拉取 md → 前端 marked 渲染 → 全文搜索。
-// 文章仓库是纯 .md + 媒体文件，无 meta.json、无 frontmatter、无 html 产物。
-// 部署时只需改顶部 REPO / BRANCH。
+// data.js —— 数据层：meta.json 枚举文章目录 → 拉取 md → 前端 marked 渲染 → 全文搜索。
+// meta.json 由文章仓库的 GitHub Actions 在 push 时自动生成（模板见 articles-setup/），
+// 走 raw 拉取，不占 REST API 配额（匿名 60 次/小时/IP，共享代理出口容易撞限）；API 仅作兜底。
+// 数据源在 config.json 配置（复制 config.example.json 填写，不进 git）。
 
-const REPO = 'East-Luo/Articles';
-const BRANCH = 'main';
-const API_URL = `https://api.github.com/repos/${REPO}/git/trees/${BRANCH}?recursive=1`;
-const RAW_BASE = `https://raw.githubusercontent.com/${REPO}/${BRANCH}`;
+let REPO = null;
+let BRANCH = null;
+let API_URL = null;
+let RAW_BASE = null;
+let META_URL = null;
+
+async function loadConfig() {
+    if (REPO) return;
+    const res = await fetch('config.json', { cache: 'no-store' });
+    if (!res.ok) {
+        const e = new Error(`HTTP ${res.status}`);
+        e.userMessage = '未配置文章仓库：请复制 config.example.json 为 config.json 并填写你的仓库';
+        throw e;
+    }
+    const cfg = await res.json();
+    REPO = cfg.repo;
+    BRANCH = cfg.branch || 'main';
+    API_URL = `https://api.github.com/repos/${REPO}/git/trees/${BRANCH}?recursive=1`;
+    RAW_BASE = `https://raw.githubusercontent.com/${REPO}/${BRANCH}`;
+    META_URL = `${RAW_BASE}/meta.json`;
+}
 
 let markedLib = null;        // 由 main 动态 import 后注入
 let hljsLib = null;          // 代码高亮库，同样由 main 注入
@@ -37,43 +55,62 @@ function resolveMediaUrl(href, dir) {
     return dir ? `${RAW_BASE}/${dir}/${href}` : `${RAW_BASE}/${href}`;
 }
 
+// 自定义渲染器绕过了 marked 默认的转义，属性值需自行转义
+const escAttr = (s) => String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+
 // 渲染单篇：marked 转 HTML，并把相对路径 src/href 指向文章所在目录
 function render(md, dir) {
     const renderer = new markedLib.Renderer();
     renderer.image = (token) => {
-        const src = resolveMediaUrl(token.href, dir);
-        const t = token.title ? ` title="${token.title}"` : '';
-        const a = token.text ? ` alt="${token.text}"` : '';
+        const src = escAttr(resolveMediaUrl(token.href, dir));
+        const t = token.title ? ` title="${escAttr(token.title)}"` : '';
+        const a = token.text ? ` alt="${escAttr(token.text)}"` : '';
         return `<img src="${src}"${a}${t}>`;
     };
     renderer.link = (token) => {
-        const url = resolveMediaUrl(token.href, dir);
-        const t = token.title ? ` title="${token.title}"` : '';
+        const url = escAttr(resolveMediaUrl(token.href, dir));
+        const t = token.title ? ` title="${escAttr(token.title)}"` : '';
         return `<a href="${url}"${t}>${token.text}</a>`;
     };
     return markedLib.parse(md, { renderer });
 }
 
-// 枚举仓库全部 .md 文件
+// 路径 → 文章条目：id = 顶层目录名，根目录文件退化为文件名
+function entryFromPath(path) {
+    const parts = path.split('/');
+    const file = parts[parts.length - 1];
+    const id = parts.length > 1 ? parts[0] : file.replace(/\.md$/i, '');
+    const dir = parts.length > 1 ? parts.slice(0, -1).join('/') : '';
+    return { id, path, dir, file };
+}
+
+// 纯数字 id 按数值排序，否则按字符串排序
+function sortEntries(list) {
+    return list.sort((a, b) => {
+        const na = parseInt(a.id, 10);
+        const nb = parseInt(b.id, 10);
+        if (!Number.isNaN(na) && !Number.isNaN(nb)) return na - nb;
+        return a.id.localeCompare(b.id);
+    });
+}
+
+// 首选：meta.json（文章仓库 push 时由 Actions 自动生成）
 async function listArticles() {
+    const res = await fetch(META_URL, { cache: 'no-store' });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const meta = await res.json();
+    return sortEntries((meta.articles || []).map(entryFromPath));
+}
+
+// 迁移期兜底：meta.json 缺失时回退 GitHub trees API（受 60 次/小时/IP 限流），稳定后可删
+async function listArticlesViaApi() {
     const res = await fetch(API_URL, { cache: 'no-store' });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
-    return (data.tree || [])
+    const paths = (data.tree || [])
         .filter((item) => item.type === 'blob' && item.path.toLowerCase().endsWith('.md'))
-        .map((item) => {
-            const parts = item.path.split('/');
-            const file = parts[parts.length - 1];
-            const id = parts.length > 1 ? parts[0] : file.replace(/\.md$/i, '');
-            const dir = parts.length > 1 ? parts.slice(0, -1).join('/') : '';
-            return { id, path: item.path, dir, file };
-        })
-        .sort((a, b) => {
-            const na = parseInt(a.id, 10);
-            const nb = parseInt(b.id, 10);
-            if (!Number.isNaN(na) && !Number.isNaN(nb)) return na - nb;
-            return a.id.localeCompare(b.id);
-        });
+        .map((item) => item.path);
+    return sortEntries(paths.map(entryFromPath));
 }
 
 async function loadOne(entry) {
@@ -98,7 +135,13 @@ async function loadOne(entry) {
 
 // 枚举 + 并发拉取并渲染全部文章，单篇失败静默跳过
 export async function fetchArticles() {
-    const list = await listArticles();
+    await loadConfig();
+    let list;
+    try {
+        list = await listArticles();
+    } catch (e) {
+        list = await listArticlesViaApi();
+    }
     const results = await Promise.all(list.map((e) => loadOne(e).catch(() => null)));
     articles = results.filter(Boolean);
     // 枚举到文章但全部加载失败时，不能表现为成功（单篇失败仍静默跳过）

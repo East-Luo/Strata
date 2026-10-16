@@ -1,14 +1,8 @@
-// search.js —— 搜索框（桌面）：展开/收起交互、全文搜索、结果渲染、快捷键唤起。
-// 自建 DOM，平台差异完全封装在模块内部。
+// search.js —— 搜索框（桌面）：三角展开/收起、输入即搜、/ 快捷键唤起。
 
 import * as data from '../../core/data.js';
 import * as wm from '../../core/window-manager.js';
-
-const HIT_LABELS = {
-    id: 'ID',
-    title: '标题',
-    body: '正文',
-};
+import { renderResults } from '../../core/search-ui.js';
 
 function isTyping(el) {
     return el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable);
@@ -33,47 +27,12 @@ export function initSearch() {
     const searchInput = searchWindow.querySelector('#searchInput');
     const searchResults = searchWindow.querySelector('#searchResults');
 
-    function showResults(results) {
-        searchResults.innerHTML = '';
-
-        if (!results.length) {
-            searchResults.style.display = 'none';
-            return;
-        }
-
-        for (const { article, hit } of results) {
-            const item = document.createElement('div');
-            item.className = 'search-result-item';
-
-            const idEl = document.createElement('div');
-            idEl.className = 'result-id';
-            idEl.textContent = article.id;
-
-            const titleEl = document.createElement('div');
-            titleEl.className = 'result-title';
-            titleEl.textContent = article.title;
-
-            item.appendChild(idEl);
-            item.appendChild(titleEl);
-            if (hit) {
-                const hitEl = document.createElement('span');
-                hitEl.className = 'result-hit';
-                hitEl.textContent = HIT_LABELS[hit] || hit;
-                item.appendChild(hitEl);
-            }
-
-            item.addEventListener('click', () => {
-                wm.open(article.id);
-                searchInput.value = '';
-                searchResults.style.display = 'none';
-                searchButton.classList.remove('active');
-            });
-
-            searchResults.appendChild(item);
-        }
-
-        searchResults.style.display = 'block';
-    }
+    const pick = (article) => {
+        wm.open(article.id);
+        searchInput.value = '';
+        searchResults.style.display = 'none';
+        searchButton.classList.remove('active');
+    };
 
     // 点击展开/收起
     searchButton.addEventListener('click', (e) => {
@@ -91,14 +50,13 @@ export function initSearch() {
         }
     });
 
-    // 输入即搜索
     searchInput.addEventListener('input', () => {
         const q = searchInput.value.trim();
-        if (q) showResults(data.search(q));
+        if (q) renderResults(searchResults, data.search(q), pick);
         else searchResults.style.display = 'none';
     });
 
-    // 快捷键 / 唤起搜索（不影响正在输入的场景）
+    // / 唤起搜索（不影响正在输入的场景）
     document.addEventListener('keydown', (e) => {
         if (e.key === '/' && !isTyping(e.target)) {
             e.preventDefault();

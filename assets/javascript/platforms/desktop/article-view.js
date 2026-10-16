@@ -1,5 +1,4 @@
 // article-view.js —— 文章窗口（桌面）：DOM 生命周期、抽屉式转场。
-// 自建 windows 容器，平台差异完全封装在模块内部。
 
 import * as wm from '../../core/window-manager.js';
 import * as data from '../../core/data.js';

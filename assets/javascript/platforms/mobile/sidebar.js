@@ -1,13 +1,15 @@
 // mobile/sidebar.js —— 顶部抽屉（手机端文章栏）。
-// 抽屉是可移动的「页」：宽 100%、高 50vh，把手在页底部。
-// 把手元素即触控区（15vh），底部 40px 为可视渐变条；下拉展开、上滑收起。
+// 结构：抽屉页（列表 + 底部握把条，同一可见表面）+ 页下方 15vh 透明热点区。
+// 收起时抽屉页上移出屏、只探出握把条，热点区垂在屏内顶部承接下拉手势。
 
 import * as data from '../../core/data.js';
 import * as wm from '../../core/window-manager.js';
 
 let drawer = null;
 let listEl = null;
-let handleEl = null;
+let sheetEl = null;
+let gripEl = null;
+let hotEl = null;
 let expanded = false;
 
 function render() {
@@ -45,10 +47,10 @@ function updateActive(stack) {
     }
 }
 
-// ---- 位置（px）控制：收起位置为 -(页高 - 把手高)，展开位置为 0 ----
+// ---- 位置（px）控制：收起位置为 -(抽屉页高 - 握把条高)，只探出握把条；展开为 0 ----
 
 function collapsedOffset() {
-    return -(drawer.offsetHeight - handleEl.offsetHeight);
+    return -(sheetEl.offsetHeight - gripEl.offsetHeight);
 }
 
 function setOffset(px) {
@@ -88,6 +90,7 @@ function initGesture() {
 
     function move(e) {
         if (!dragging) return;
+        e.preventDefault(); // 双保险：即使有浏览器不认 touch-action，也不让页面跟着滚
         const dy = e.touches[0].clientY - startY;
         maxDy = Math.max(maxDy, Math.abs(dy));
         setOffset(Math.max(collapsedOffset(), Math.min(0, startOffset + dy)));
@@ -107,8 +110,9 @@ function initGesture() {
         }
     }
 
-    handleEl.addEventListener('touchstart', start, { passive: true });
-    document.addEventListener('touchmove', move, { passive: true });
+    gripEl.addEventListener('touchstart', start, { passive: true });
+    hotEl.addEventListener('touchstart', start, { passive: true });
+    document.addEventListener('touchmove', move, { passive: false });
     document.addEventListener('touchend', end);
 
     // 展开后：点击抽屉覆盖范围外（含右下角小三角）自动收起
@@ -123,12 +127,17 @@ export function initSidebar() {
     drawer.id = 'mobileSidebar';
     drawer.className = 'mobile-sidebar';
     drawer.innerHTML = `
-        <div class="sidebar-list"></div>
-        <div class="sidebar-handle"><div class="handle-bar">☰</div></div>
+        <div class="sidebar-sheet">
+            <div class="sidebar-list"></div>
+            <div class="sidebar-grip"><div class="handle-bar">☰</div></div>
+        </div>
+        <div class="sidebar-handle"></div>
     `;
     document.body.appendChild(drawer);
     listEl = drawer.querySelector('.sidebar-list');
-    handleEl = drawer.querySelector('.sidebar-handle');
+    sheetEl = drawer.querySelector('.sidebar-sheet');
+    gripEl = drawer.querySelector('.sidebar-grip');
+    hotEl = drawer.querySelector('.sidebar-handle');
 
     render();
     wm.subscribe(updateActive);

@@ -1,0 +1,16 @@
+# 各部署方私有配置（复制 config.example.json 填写）
+config.json
+
+# 本地 AI 代理文档，不随作品分发
+AGENTS.md
+
+# 系统产物
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# 编辑器
+.vscode/
+.idea/
+*.swp
+*~

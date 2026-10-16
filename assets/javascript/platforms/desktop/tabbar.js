@@ -1,5 +1,4 @@
 // tabbar.js —— 标签栏（桌面）：window-manager 栈状态的投影，纯视图层。
-// 自建 DOM，平台差异完全封装在模块内部。
 
 import * as wm from '../../core/window-manager.js';
 import * as data from '../../core/data.js';

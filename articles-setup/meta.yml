@@ -1,0 +1,48 @@
+# 文章元数据自动生成：push 涉及 .md 时重建 meta.json 并回提仓库。
+# GITHUB_TOKEN 的回提不会再触发 workflow（GitHub 防递归设计），不存在循环。
+# 用法：把本文件复制到你的文章仓库的 .github/workflows/ 目录下并 push 即可，无需其他改动。
+name: 更新文章元数据
+
+on:
+  push:
+    paths:
+      - '**.md'
+      - '.github/workflows/meta.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: meta
+  cancel-in-progress: false
+
+jobs:
+  meta:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 生成 meta.json
+        run: |
+          python3 - <<'EOF'
+          import json, os
+          paths = []
+          for root, dirs, files in os.walk('.'):
+              dirs[:] = [d for d in dirs if not d.startswith('.')]
+              for f in files:
+                  if f.lower().endswith('.md'):
+                      paths.append(os.path.relpath(os.path.join(root, f), '.'))
+          paths.sort()
+          with open('meta.json', 'w', encoding='utf-8') as fp:
+              json.dump({'version': 1, 'articles': paths}, fp, ensure_ascii=False, indent=2)
+          print(f'共 {len(paths)} 篇文章')
+          EOF
+
+      - name: 提交 meta.json
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add meta.json
+          git diff --cached --quiet || git commit -m "chore: 更新 meta.json"
+          git push

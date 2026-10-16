@@ -1,36 +1,61 @@
 /* mobile.css —— 手机平台样式：顶部抽屉、居中搜索框+右下三角、底部横向标签 */
 
-/* ============ 顶部抽屉（文章栏）：把手在页底部，整页一起拖 ============ */
+/* ============ 顶部抽屉（文章栏）：抽屉页 + 下方透明热点区 ============ */
 
-/* 抽屉是一个可移动的「页」：宽 100%、高 70vh，把手在底部 */
+/* 容器：透明，仅负责定位。收起时上移出屏，只探出抽屉页底部的握把条。
+   定位用 top 而非 transform：JS 拖拽逐帧改 top */
 .mobile-sidebar {
     position: fixed;
-    /* 收起：顶部上移到 -(50vh-15vh)，露出整个把手触控区。
-       用 top 而非 transform，避免成为列表 backdrop-filter 的 transform 祖先 */
-    top: calc(-50vh + 15vh);
+    top: calc(-50vh + 28px); /* 初始估值，JS 初始化时按真实高度重算 */
     left: 0;
     right: 0;
-    height: 50vh;
     display: flex;
     flex-direction: column;
     z-index: 1000;
-    /* 用 visibility 而非 opacity 控制 reveal，避免成为列表 backdrop-filter 的 opacity 祖先 */
     visibility: hidden;
     transition: top 0.3s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
+/* reveal 时整个抽屉往下跳一下再回弹，提示可下拉。
+   动画作用于 top（非 transform/opacity），不会破坏抽屉页的 backdrop-filter 采样；
+   关键帧数值与下方抽屉页 50vh、握把条 28px 耦合，改尺寸时同步改这里 */
 .mobile-sidebar.ready {
     visibility: visible;
+    animation: drawer-bounce 0.7s var(--ease-window);
 }
 
-/* 文章列表：毛玻璃（自身 backdrop-filter，祖先无 transform/opacity 保证采样稳定） */
+@keyframes drawer-bounce {
+    0% {
+        top: calc(-50vh + 28px);
+    }
+    55% {
+        top: calc(-50vh + 42px);
+    }
+    78% {
+        top: calc(-50vh + 24px);
+    }
+    100% {
+        top: calc(-50vh + 28px);
+    }
+}
+
+/* 抽屉页：唯一可见表面——白色微透 + 模糊，在纯黑背景上「略高于背景色」，
+   与桌面侧栏同一视觉语言；含文章列表与底部握把条 */
+.sidebar-sheet {
+    height: 50vh;
+    display: flex;
+    flex-direction: column;
+    background: rgba(255, 255, 255, 0.16);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.22);
+}
+
+/* 文章列表：背景与模糊在抽屉页上，此处透明 */
 .sidebar-list {
     flex: 1;
     overflow-y: auto;
     padding: 15px;
-    background: rgba(24, 24, 24, 0.7);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
 }
 
 .sidebar-list h3 {
@@ -39,66 +64,38 @@
     font-size: 16px;
 }
 
-/* 把手：15vh 触控区，顶部 40px 渐变条为可视把手（紧贴主体底部） */
-.sidebar-handle {
-    height: 15vh;
+/* 握把条：抽屉页的底边，与页同一表面；收起时唯一探出屏幕的部分。
+   touch-action: none —— 阻止浏览器把手势当原生页面滚动，
+   否则拖拽会与 JS 位移竞争，带着整个 fixed 页面（含背景）一起滑 */
+.sidebar-grip {
+    height: 28px;
     flex-shrink: 0;
-    display: flex;
-    align-items: flex-start;
-    justify-content: center;
-    user-select: none;
-}
-
-.handle-bar {
-    width: 100px;
-    height: 30px;
-    margin-top: 8px;
     display: flex;
     align-items: center;
     justify-content: center;
+    user-select: none;
+    touch-action: none;
+}
+
+/* 可视握把：☰ 文本符号（与桌面侧栏提示同为纯白） */
+.handle-bar {
     color: var(--color-fg);
-    font-size: 12px;
-    /* 悬浮胶囊：左右半圆 + 中间长方形，毛玻璃风格与底部 dock 一致 */
-    border-radius: 15px;
-    background: rgba(30, 30, 30, 0.55);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
-    border: 1px solid rgba(255, 255, 255, 0.15);
-    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.35);
+    font-size: 14px;
+    line-height: 1;
 }
 
-/* reveal 时把手往下跳一下并淡入，提示可下拉 */
-.mobile-sidebar.ready .handle-bar {
-    animation: handle-bounce 0.7s var(--ease-window);
-}
-
-@keyframes handle-bounce {
-    0% {
-        opacity: 0;
-        transform: translateY(-14px);
-    }
-    30% {
-        opacity: 1;
-    }
-    55% {
-        transform: translateY(14px);
-    }
-    75% {
-        transform: translateY(-5px);
-    }
-    100% {
-        opacity: 1;
-        transform: translateY(0);
-    }
+/* 热点区：抽屉页下方垂出的 15vh 透明触控延伸，不可见，
+   收起时它留在屏内顶部，承接下拉手势 */
+.sidebar-handle {
+    height: 15vh;
+    flex-shrink: 0;
+    touch-action: none;
 }
 
 /* ============ 搜索框：居中、默认展开、无三角形按钮 ============ */
 
-/* 关键修复：backdrop-filter 元素的祖先若带 opacity 动画/filter/transform/mask，
-   Chromium 会丢失毛玻璃采样（Firefox 也延迟到动画结束才生效）。
-   tokens.css 给 .search-window 做了 opacity 淡入，这里改为 visibility 控制显隐：
-   祖先不再经过 opacity 过渡，backdrop-filter 稳定生效；
-   搜索框自身用 opacity 动画补回淡入（backdrop-filter 元素自身的 opacity 不影响模糊采样）。 */
+/* backdrop-filter 祖先链动画会破坏毛玻璃采样（完整说明见 desktop.css 搜索框一节）。
+   这里同样改 visibility 控制显隐，淡入补在 input 自身 */
 .search-window {
     opacity: 1;
     visibility: hidden;
