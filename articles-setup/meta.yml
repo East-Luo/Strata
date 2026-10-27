@@ -1,6 +1,7 @@
 # 文章元数据自动生成：push 涉及 .md 时重建 meta.json 并回提仓库。
+# 编号由工作流增量分配：已有编号永久保留，新文章取最大编号 +1，不复用。
+# 作者只需在任意路径建 .md 写内容，push 后编号、排序、清单全自动。
 # GITHUB_TOKEN 的回提不会再触发 workflow（GitHub 防递归设计），不存在循环。
-# 用法：把本文件复制到你的文章仓库的 .github/workflows/ 目录下并 push 即可，无需其他改动。
 name: 更新文章元数据
 
 on:
@@ -27,16 +28,47 @@ jobs:
         run: |
           python3 - <<'EOF'
           import json, os
+
+          README = 'readme.md'  # 根目录仓库说明，不计入文章
+
+          # 读取既有编号；v1 纯路径数组按原顺序迁移
+          old = {}
+          if os.path.exists('meta.json'):
+              try:
+                  data = json.load(open('meta.json', encoding='utf-8'))
+                  items = data.get('articles', [])
+                  if data.get('version') == 2:
+                      old = {a['path']: a['id'] for a in items}
+                  else:
+                      old = {p: i + 1 for i, p in enumerate(items) if isinstance(p, str)}
+              except (ValueError, KeyError, TypeError):
+                  old = {}
+
+          # 扫描全仓库任意深度的 .md
           paths = []
           for root, dirs, files in os.walk('.'):
               dirs[:] = [d for d in dirs if not d.startswith('.')]
               for f in files:
                   if f.lower().endswith('.md'):
-                      paths.append(os.path.relpath(os.path.join(root, f), '.'))
+                      rel = os.path.relpath(os.path.join(root, f), '.')
+                      if rel.lower() != README:
+                          paths.append(rel)
           paths.sort()
+
+          # 保留旧编号，新文件按最大编号 +1 追加
+          next_id = max(old.values(), default=0) + 1
+          articles = []
+          for p in paths:
+              if p in old:
+                  articles.append({'id': old[p], 'path': p})
+              else:
+                  articles.append({'id': next_id, 'path': p})
+                  next_id += 1
+          articles.sort(key=lambda a: a['id'])
+
           with open('meta.json', 'w', encoding='utf-8') as fp:
-              json.dump({'version': 1, 'articles': paths}, fp, ensure_ascii=False, indent=2)
-          print(f'共 {len(paths)} 篇文章')
+              json.dump({'version': 2, 'articles': articles}, fp, ensure_ascii=False, indent=2)
+          print(f'共 {len(articles)} 篇文章')
           EOF
 
       - name: 提交 meta.json

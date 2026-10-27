@@ -4,6 +4,7 @@
 import * as data from './core/data.js';
 import { createIntro } from './core/background.js';
 import { initBranding } from './core/branding.js';
+import { initRouter, startRouter } from './core/router.js';
 import { detectPlatform } from './platform.js';
 
 const MARKED_URL = 'https://cdn.jsdelivr.net/npm/marked@15.0.12/lib/marked.esm.js';
@@ -15,12 +16,15 @@ let platform = null;
 
 function revealUI() {
     platform?.reveal();
+    startRouter();
 }
 
+// 时间戳参数破缓存：nginx 静态文件的协商缓存可能让手机浏览器在新鲜期内
+// 不发请求，改动部署后看不到更新；每次注入新 URL 强制取最新
 function injectStyle(href) {
     const link = document.createElement('link');
     link.rel = 'stylesheet';
-    link.href = href;
+    link.href = `${href}?t=${Date.now()}`;
     document.head.appendChild(link);
 }
 
@@ -72,6 +76,7 @@ async function boot() {
     intro.dataReady();
 
     platform.initComponents();
+    initRouter();
 }
 
 boot();

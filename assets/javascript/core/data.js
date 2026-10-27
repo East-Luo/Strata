@@ -94,12 +94,26 @@ function sortEntries(list) {
     });
 }
 
+// v2 meta 条目：{ id, path }，编号由 Actions 增量分配，顺序即编号顺序
+function entryFromMeta(item) {
+    const parts = item.path.split('/');
+    return {
+        id: String(item.id),
+        path: item.path,
+        dir: parts.slice(0, -1).join('/'),
+        file: parts[parts.length - 1],
+    };
+}
+
 // 首选：meta.json（文章仓库 push 时由 Actions 自动生成）
 async function listArticles() {
     const res = await fetch(META_URL, { cache: 'no-store' });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const meta = await res.json();
-    return sortEntries((meta.articles || []).map(entryFromPath));
+    const items = meta.articles || [];
+    // v2：带编号的条目；v1：纯路径数组，迁移期沿用目录名解析
+    if (items.length && typeof items[0] === 'object') return items.map(entryFromMeta);
+    return sortEntries(items.map(entryFromPath));
 }
 
 // 迁移期兜底：meta.json 缺失时回退 GitHub trees API（受 60 次/小时/IP 限流），稳定后可删

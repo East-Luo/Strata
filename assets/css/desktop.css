@@ -1,25 +1,29 @@
 /* desktop.css —— 桌面平台样式：hover 侧栏、居中搜索框、右侧标签栏、抽屉式文章窗口 */
 
-/* ============ 侧边栏：悬停拉出，离开缩回 ============ */
+/* ============ 侧边栏：完整长方形面板，hover 整块平移拉出，离开缩回 ============ */
+
+/* 收起时整体移出屏外，只留 40px 把手列。平移用 left 而非 transform：
+   backdrop-filter 祖先链的 transform 动画会破坏毛玻璃采样（同手机端抽屉） */
 .sidebar {
     position: fixed;
-    left: 0;
+    left: -210px; /* -(面板 250px - 把手 40px)，与下方 keyframes 数值耦合 */
     top: 0;
-    width: 40px;
+    width: 250px;
     height: 100vh;
+    display: flex;
     /* 白色半透明 + blur：侧栏背后是纯黑 canvas（四面体在屏幕中央），
        白色基底在纯黑上呈现灰白磨砂，否则深灰基底会与黑背景融为一体看不出效果 */
     background: rgba(255, 255, 255, 0.08);
     backdrop-filter: blur(16px);
     -webkit-backdrop-filter: blur(16px);
     border-right: 1px solid rgba(255, 255, 255, 0.12);
-    transition: width 0.3s ease;
+    transition: left 0.3s ease;
     z-index: 999;
     overflow: hidden;
     opacity: 0;
 }
 
-/* reveal 时从左侧弹入，往右跳一下提示可交互 */
+/* reveal 时从屏外弹入，向右跳一下提示可交互；数值与面板 250px、把手 40px 耦合 */
 .sidebar.ready {
     animation: sidebar-reveal 0.7s var(--ease-window) forwards;
 }
@@ -27,33 +31,30 @@
 @keyframes sidebar-reveal {
     0% {
         opacity: 0;
-        transform: translateX(-60px);
+        left: -320px;
     }
     55% {
         opacity: 1;
-        transform: translateX(14px);
+        left: -186px;
     }
     78% {
         opacity: 1;
-        transform: translateX(-5px);
+        left: -224px;
     }
     100% {
         opacity: 1;
-        transform: none;
+        left: -210px;
     }
 }
 
 .sidebar:hover {
-    width: 250px;
+    left: 0;
 }
 
+/* 把手列：面板左列 40px 全高，☰ 垂直居中，收起时唯一可见部分 */
 .sidebar-collapsed-hint {
-    position: absolute;
-    left: 0;
-    top: 50%;
-    transform: translateY(-50%);
     width: 40px;
-    height: 40px;
+    flex-shrink: 0;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -67,17 +68,13 @@
     visibility: hidden;
 }
 
+/* 内容列：面板右列，随整块平移进出，无需单独淡入 */
 .sidebar-content {
+    flex: 1;
+    min-width: 0;
     height: 100%;
     padding: 15px;
-    padding-left: 40px;
-    opacity: 0;
-    transition: opacity 0.3s ease;
     overflow-y: auto;
-}
-
-.sidebar:hover .sidebar-content {
-    opacity: 1;
 }
 
 .sidebar h3 {
