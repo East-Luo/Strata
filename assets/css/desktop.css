@@ -1,31 +1,36 @@
 /* desktop.css —— 桌面平台样式：hover 侧栏、居中搜索框、右侧标签栏、抽屉式文章窗口 */
 
-/* ============ 侧边栏：完整长方形面板，hover 整块平移拉出，离开缩回 ============ */
+/* ============ 侧边栏：窗口等高直角面板，hover 整块平移拉出，离开缩回 ============ */
 
-/* 收起时整体移出屏外，只留 40px 把手列。平移用 left 而非 transform：
+/* 右侧 40px 为常驻装饰列。收起时整块移出屏外、探出完整装饰列（☰ 全可见），
+   平移量 = 面板宽 250 - 40。平移用 left 而非 transform：
    backdrop-filter 祖先链的 transform 动画会破坏毛玻璃采样（同手机端抽屉） */
 .sidebar {
     position: fixed;
-    left: -210px; /* -(面板 250px - 把手 40px)，与下方 keyframes 数值耦合 */
+    left: -210px; /* -(250 - 40)：收起只探出装饰列 */
     top: 0;
     width: 250px;
     height: 100vh;
     display: flex;
-    /* 白色半透明 + blur：侧栏背后是纯黑 canvas（四面体在屏幕中央），
+    /* 白色半透明 + blur：面板背后是纯黑 canvas（四面体在屏幕中央），
        白色基底在纯黑上呈现灰白磨砂，否则深灰基底会与黑背景融为一体看不出效果 */
     background: rgba(255, 255, 255, 0.08);
     backdrop-filter: blur(16px);
     -webkit-backdrop-filter: blur(16px);
-    border-right: 1px solid rgba(255, 255, 255, 0.12);
+    border: 1px solid rgba(255, 255, 255, 0.12);
     transition: left 0.3s ease;
     z-index: 999;
     overflow: hidden;
     opacity: 0;
 }
 
-/* reveal 时从屏外弹入，向右跳一下提示可交互；数值与面板 250px、把手 40px 耦合 */
+/* reveal 时从屏外弹入，向右跳一下提示可交互。
+   不用 forwards：动画填充样式会持续压住 :hover 的 left，结束后回落静态收起态。
+   峰值 -198（探出 52px）：词条高亮右缘 = 52 - 40(装饰列) - 15(列 padding) - 12(收紧)
+   = -15，不渗入主界面 */
 .sidebar.ready {
-    animation: sidebar-reveal 0.7s var(--ease-window) forwards;
+    animation: sidebar-reveal 0.7s var(--ease-window);
+    opacity: 1;
 }
 
 @keyframes sidebar-reveal {
@@ -35,11 +40,11 @@
     }
     55% {
         opacity: 1;
-        left: -186px;
+        left: -198px;
     }
     78% {
         opacity: 1;
-        left: -224px;
+        left: -218px;
     }
     100% {
         opacity: 1;
@@ -51,7 +56,7 @@
     left: 0;
 }
 
-/* 把手列：面板左列 40px 全高，☰ 垂直居中，收起时唯一可见部分 */
+/* 装饰列：面板右列 40px 全高，☰ 垂直居中常驻（纯装饰，不可选中、非点击目标） */
 .sidebar-collapsed-hint {
     width: 40px;
     flex-shrink: 0;
@@ -60,21 +65,23 @@
     justify-content: center;
     color: var(--color-fg);
     font-size: 18px;
-    cursor: pointer;
+    user-select: none;
+    cursor: default;
 }
 
-.sidebar:hover .sidebar-collapsed-hint {
-    opacity: 0;
-    visibility: hidden;
-}
-
-/* 内容列：面板右列，随整块平移进出，无需单独淡入 */
+/* 内容列：面板左列，随整块平移进出，无需单独淡入 */
 .sidebar-content {
     flex: 1;
     min-width: 0;
     height: 100%;
     padding: 15px;
     overflow-y: auto;
+}
+
+/* 词条高亮右侧收紧 12px：收起与弹跳全程高亮右缘均为负值，不渗入主界面
+   （推导见上方 reveal 注释） */
+.sidebar-content .sidebar-item {
+    margin-right: 12px;
 }
 
 .sidebar h3 {

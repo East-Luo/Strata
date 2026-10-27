@@ -42,11 +42,11 @@ export function initSidebar() {
     root.id = 'sidebar';
     root.className = 'sidebar';
     root.innerHTML = `
-        <div class="sidebar-collapsed-hint"><span>☰</span></div>
         <div class="sidebar-content">
             <h3>文章列表</h3>
             <div class="article-list"></div>
         </div>
+        <div class="sidebar-collapsed-hint"><span>☰</span></div>
     `;
     document.body.appendChild(root);
     listEl = root.querySelector('.article-list');

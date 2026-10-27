@@ -59,7 +59,8 @@ async function boot() {
     // 平台资源：动态拉取对应平台的 js + 注入对应平台的 css
     const platformName = detectPlatform();
     try {
-        platform = await withTimeout(import(`./platforms/${platformName}/index.js`), TIMEOUT);
+        // 时间戳参数破缓存：平台模块链与 CSS 同策略，避免改动部署后浏览器沿用旧模块
+        platform = await withTimeout(import(`./platforms/${platformName}/index.js?t=${Date.now()}`), TIMEOUT);
         injectStyle(`assets/css/${platformName}.css`);
     } catch (e) {
         intro.fail('加载平台资源失败');
